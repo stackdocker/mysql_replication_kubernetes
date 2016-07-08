@@ -1,0 +1,80 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    name: pxc-node1 
+  name: pxc-node1 
+spec:
+  replicas: 1
+  selector:
+    name: pxc-node1 
+  template:
+    metadata:
+      labels:
+        app: mysql-galera
+        name: pxc-node1
+    spec:
+      containers:
+      - command:
+        - /entrypoint.sh
+        env:
+        - name: GALERA_CLUSTER
+          value: "true"
+        - name: WSREP_CLUSTER_ADDRESS
+          value: gcomm://
+        - name: WSREP_SST_USER
+          value: sst
+        - name: WSREP_SST_PASSWORD
+          value: sst
+        - name: MYSQL_USER
+          value: mysql
+        - name: MYSQL_PASSWORD
+          value: mysql
+        - name: MYSQL_ROOT_PASSWORD
+          value: c-krit 
+        image: "capttofu/percona_xtradb_cluster_5_6:latest"
+        imagePullPolicy: IfNotPresent # Always Never
+        name: pxc-node1 
+        ports:
+        - containerPort: 3306 
+          name: client 
+        - containerPort: 4444 
+          name: sst 
+        - containerPort: 4567
+          name: rep
+        - containerPort: 4568
+          name: incsst
+        resources:
+          limits:
+            cpu: 1
+        volumeMounts:
+        - mountPath: /mnt/rbd
+          # name: ceph-rbd
+          name: galera-rbd
+          # name: nas-iscsi
+      volumes:
+      - name: ceph-rbd
+        rbd:
+          monitors:
+          - 192.168.1.13:6789
+          - 192.168.1.14:6789
+          pool: kube
+          image: mysql-galera-demo
+          user: admin
+          keyring: /etc/ceph/keyring
+          fsType: ext4
+          secretRef: {}
+          readOnly: false
+      - name: galera-rbd
+        persistentVolumeClaim:
+          claimName: galera-rbd-pvc1
+          readOnly: false
+      # - name: nas-iscsi
+      #   iscsi:      
+      #     targetPortal: 192.168.1.11
+      #     iqn: iqn.1992-01.com.example:storage:diskarrays-sn-a8675309
+      #     lun: 1
+      #     iscsiInterface: default
+      #     fsType: xfs
+      #     readOnly: false
+

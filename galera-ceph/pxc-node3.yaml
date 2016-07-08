@@ -1,0 +1,142 @@
+# all-in-one: PV, PVC, SVC, RC
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  annotations:
+    qingyuanos.com/catalog-by: '{"version": "v1alpha", "lib": "https://github.com/qingyuancloud/harpoon", "documentation": "https://github.com/kubernetes/kubernetes/tree/master/examples/rbd"}'
+  labels:
+    app: mysql-galera
+    heritage: qingyuancloud
+    name: mysql-galera-ceph-rbd
+    project: openshift.org
+  name: secret-rbd-pv3
+spec:
+  accessModes:
+    - ReadOnlyMany
+    - ReadWriteMany
+    - ReadWriteOnce
+  capacity:
+    storage: 5Gi
+  claimRef:
+    name: secret-rbd-pvc3
+  rbd:
+    monitors:
+    - 192.168.1.13:6789
+    - 192.168.1.14:6789
+    pool: kube
+    image: secret-rbd-data3
+    user: admin
+    keyring: /etc/ceph/keyring
+    fsType: ext4
+    secretRef:
+      name: ceph-secret
+    readOnly: false
+  persistentVolumeReclaimPolicy: Retain # Recycle Delete Retain
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  annotations:
+    qingyuanos.com/catalog-by: '{"version": "v1alpha", "lib": "https://github.com/qingyuancloud/harpoon", "documentation": "https://github.com/kubernetes/kubernetes/tree/master/examples/rbd"}'
+  labels:
+    app: mysql-galera
+    heritage: qingyuancloud
+    name: mysql-galera-ceph-rbd
+    project: openshift.org
+  name: secret-rbd-pvc3
+spec:
+  accessModes:
+  - ReadOnlyMany
+  - ReadWriteMany
+  - ReadWriteOnce
+  resources:
+    limits:
+      storage: 5Gi
+    requests:
+      storage: 500Mi
+  volumeName: secret-rbd-pv3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  lables:
+    name: pxc-node3
+  name: pxc-node3-ceph-secret
+spec:
+  ports:
+  - port: 3306
+    targetPort: 3306
+    name: mysql
+  - port: 4444
+    targetPort: 4444 
+    name: state-snapshot-transfer
+  - port: 4567
+    targetPort: 4567
+    name: replication-traffic 
+  - port: 4568
+    targetPort: 4568 
+    name: incremental-state-transfer 
+  selector:
+    name: pxc-node3-ceph-secret
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    name: pxc-node3
+  name: pxc-node3-ceph-secret
+spec:
+  replicas: 1
+  selector:
+    name: pxc-node3-ceph-secret
+  template:
+    metadata:
+      labels:
+        app: mysql-galera-ceph-secret
+        name: pxc-node3
+      name: pxc-node3-ceph-secret
+    spec:
+      containers:
+      - resources:
+          limits: 
+            cpu: 0.5
+        image: capttofu/percona_xtradb_cluster_5_6:latest
+        imagePullPolicy: IfNotPresent
+        name: pxc-node3
+        ports:
+        - containerPort: 3306
+          hostPort: 3306
+          name: mysql
+        - containerPort: 4444
+          hostPort: 4444
+          # name: state-snapshot-transfer
+        - containerPort: 4567
+          hostPort: 4567
+          # name: replication-traffic
+        - containerPort: 4568
+          hostPort: 4568
+          # name: incremental-state-transfer
+        env:
+        - name: GALERA_CLUSTER
+          value: "true"
+        - name: WSREP_CLUSTER_ADDRESS
+          value: gcomm://
+        - name: WSREP_SST_USER
+          value: sst
+        - name: WSREP_SST_PASSWORD
+          value: sst
+        - name: MYSQL_USER
+          value: mysql
+        - name: MYSQL_PASSWORD
+          value: mysql
+        - name: MYSQL_ROOT_PASSWORD
+          value: c-krit
+        volumeMounts:
+        - mountPath: /mnt/rbd
+          name: galera-rbd
+      volumes:
+      - name: galera-rbd
+        persistentVolumeClaim:
+          claimName: secret-rbd-pvc3
+          readOnly: false

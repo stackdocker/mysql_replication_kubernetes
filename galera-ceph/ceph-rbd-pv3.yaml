@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  annotations:
+    qingyuanos.com/catalog-by: '{"version": "v1alpha", "lib": "https://github.com/qingyuancloud/harpoon", "documentation": "https://github.com/kubernetes/kubernetes/tree/master/examples/rbd"}'
+  labels:
+    app: mysql-galera
+    heritage: qingyuancloud
+    name: mysql-galera-ceph-rbd
+    project: openshift.org
+  name: galera-rbd-pv3
+spec:
+  accessModes:
+    - ReadOnlyMany
+    - ReadWriteMany
+    - ReadWriteOnce
+  capacity:
+    storage: 5Gi
+  claimRef:
+    name: galera-rbd-pvc3
+  rbd:
+    monitors:
+    - 192.168.1.13:6789
+    - 192.168.1.14:6789
+    pool: kube
+    image: mysql-galera-data3
+    user: admin
+    keyring: /etc/ceph/keyring
+    fsType: ext4
+    secretRef: {}
+    readOnly: false
+  persistentVolumeReclaimPolicy: Retain # Recycle Delete Retain
